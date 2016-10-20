@@ -24,6 +24,10 @@ module.exports = function(RED) {
             this.on("input", function(msg) {
                 var payloads = [];
 
+                if(msg.hasOwnProperty("kafkaTopics")){
+                    topics = msg.kafkaTopics;
+        	}
+
                 // check if multiple topics
                 if (topics.indexOf(",") > -1){
                     var topicArry = topics.split(',');
@@ -73,7 +77,7 @@ module.exports = function(RED) {
         var clusterZookeeper = config.zkquorum;
         var groupId = config.groupId;
         var debug = (config.debug == "debug");
-        var client = new Client(clusterZookeeper);
+        var client;
 
         var topicJSONArry = [];
 
@@ -103,30 +107,41 @@ module.exports = function(RED) {
             autoCommitMsgCount: 10
         };
 
+        var createConsumer = function(retry, node, client){
+          try {
+              client = new Client(clusterZookeeper);
+              var consumer = new HighLevelConsumer(client, topics, options);
+              node.log("Consumer created...");
+              node.status({fill:"green",shape:"dot",text:"connected to "+clusterZookeeper});
 
-        try {
-            var consumer = new HighLevelConsumer(client, topics, options);
-            this.log("Consumer created...");
-            this.status({fill:"green",shape:"dot",text:"connected to "+clusterZookeeper});
+              consumer.on('message', function (message) {
+                  if (debug) {
+                      console.log(message);
+                      node.log(message);
+                  }
+                  var msg = {payload: message};
+                  node.send(msg);
+              });
 
-            consumer.on('message', function (message) {
-                if (debug) {
-                    console.log(message);
-                    node.log(message);
-                }
-                var msg = {payload: message};
-                node.send(msg);
-            });
 
-            
-            consumer.on('error', function (err) {
-               console.error(err);
-            });
+              consumer.on('error', function (err) {
+                 console.error(err);
+                 node.status({fill:"red",shape:"dot",text:"NOT connected to "+clusterZookeeper});
+                 consumer.close();
+                 if(retry){
+                   console.error("Retry to connect after 15s");
+                   setTimeout(function() {console.error("Retrying...");createConsumer(false, node, client);}, 15000);
+                 }
+              });
+          }
+          catch(e){
+              node.error(e);
+              return;
+          }
         }
-        catch(e){
-            node.error(e);
-            return;
-        }
+
+        createConsumer(true, this, client);
+
     }
 
     RED.nodes.registerType("kafka in", kafkaInNode);
