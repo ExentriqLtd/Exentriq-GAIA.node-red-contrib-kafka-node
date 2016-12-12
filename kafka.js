@@ -106,6 +106,10 @@ module.exports = function(RED) {
             autoCommit: config.autoCommit,
             autoCommitMsgCount: 10
         };
+        
+        if(config.buffer){
+            options.encoding='buffer';
+        }
 
         var createConsumer = function(retry, node, client){
           try {
