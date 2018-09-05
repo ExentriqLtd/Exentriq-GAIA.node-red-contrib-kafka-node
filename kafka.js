@@ -129,12 +129,11 @@ module.exports = function(RED) {
 
 
               consumer.on('error', function (err) {
-                 console.error(err);
                  node.status({fill:"red",shape:"dot",text:"NOT connected to "+clusterZookeeper});
                  consumer.close();
                  if(retry){
-                   console.error("Retry to connect after 15s");
-                   setTimeout(function() {console.error("Retrying...");createConsumer(false, node, client);}, 15000);
+                   console.log("Retry to connect after 15s");
+                   setTimeout(function() {console.log("Retrying...");createConsumer(false, node, client);}, 15000);
                  }
               });
           }
